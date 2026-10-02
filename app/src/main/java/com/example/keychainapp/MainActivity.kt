@@ -1,88 +1,55 @@
 package com.example.keychainapp
 
-import android.net.Uri
 import android.os.Bundle
-import android.widget.Button
-import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import x1okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.asRequestBody
-import java.io.File
-import java.io.FileOutputStream
+import androidx.core.view.GravityCompat
+import androidx.fragment.app.Fragment
+import com.google.android.material.navigation.NavigationView
+import androidx.drawerlayout.widget.DrawerLayout
+import androidx.appcompat.widget.Toolbar
 
 class MainActivity : AppCompatActivity() {
 
-    private val ipESP32 = "192.168.4.1"
-
-    private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
-            val fileGif = getFileFromUri(it)
-            if (fileGif != null) {
-                Toast.makeText(this, "Mulai ngirim...", Toast.LENGTH_SHORT).show()
-                eksekusiUpload(fileGif)
-            }
-        }
-    }
+    private lateinit var drawerLayout: DrawerLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val btnUpload: Button = findViewById(R.id.btnUpload)
-        btnUpload.setOnClickListener {
-            filePickerLauncher.launch("image/gif")
+        drawerLayout = findViewById(R.id.drawerLayout)
+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        val navView = findViewById<NavigationView>(R.id.navView)
+
+        // Setup Toolbar & Garis Hamburger
+        setSupportActionBar(toolbar)
+        val toggle = ActionBarDrawerToggle(
+            this, drawerLayout, toolbar,
+            R.string.buka_laci, R.string.tutup_laci // Tar lu tambahin aja di strings.xml
+        )
+        drawerLayout.addDrawerListener(toggle)
+        toggle.syncState()
+
+        // Default layar pas pertama buka aplikasi
+        if (savedInstanceState == null) {
+            gantiLayar(MediaFragment())
+            navView.setCheckedItem(R.id.nav_media)
         }
-    }
 
-    private fun eksekusiUpload(file: File) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val client = OkHttpClient()
-                val requestBody = MultipartBody.Builder()
-                    .setType(MultipartBody.FORM)
-                    .addFormDataPart(
-                        "file",
-                        file.name,
-                        file.asRequestBody("image/gif".toMediaTypeOrNull())
-                    ).build()
-
-                val request = Request.Builder()
-                    .url("http://$ipESP32/upload")
-                    .post(requestBody)
-                    .build()
-
-                val response = client.newCall(request).execute()
-
-                withContext(Dispatchers.Main) {
-                    if (response.isSuccessful) {
-                        Toast.makeText(this@MainActivity, "Upload Sukses!", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@MainActivity, "Gagal. ESP32 nolak.", Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "Error: Belum konek WiFi ESP", Toast.LENGTH_LONG).show()
-                }
+        // Logika pas menu diklik
+        navView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_media -> gantiLayar(MediaFragment()) // Layar Foto & Video/GIF
+                R.id.nav_text -> gantiLayar(TextFragment())   // Layar Running Text (yg kemaren gua kasih)
             }
+            drawerLayout.closeDrawer(GravityCompat.START)
+            true
         }
     }
 
-    private fun getFileFromUri(uri: Uri): File? {
-        val inputStream = contentResolver.openInputStream(uri) ?: return null
-        val tempFile = File(cacheDir, "temp_upload.gif")
-        val outputStream = FileOutputStream(tempFile)
-        inputStream.copyTo(outputStream)
-        inputStream.close()
-        outputStream.close()
-        return tempFile
+    private fun gantiLayar(fragment: Fragment) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragmentContainer, fragment)
+            .commit()
     }
 }
